@@ -37,12 +37,24 @@ int onebyte_open(struct inode *inode, struct file *filep){
 // Always successful. This time no post-processing needed so do nothing.
 int onebyte_release(struct inode *inode, struct file *filep){
 	numOpens--;
-	printk(KERN_INFO "onebyte device: %d fds open.\n", numOpens);
+	printk(KERN_INFO "Onebyte device: %d fds open.\n", numOpens);
 	return 0;
 }
 
 ssize_t onebyte_read(struct file *filep, char *buf, size_t count, loff_t *f_pos){
-	unsigned long res = copy_to_user(buf, onebyte_data, 1);
+	unsigned long res;
+
+	if(!buf){	// If buf is NULL
+		printk(KERN_ALERT "Onebyte device: Reading into invalid buffer!\n");
+		return 0;
+	}
+
+	if(*f_pos>0){
+		printk(KERN_ALERT "Onebyte device: Reading outside device boundary!\n");
+		return 0;
+	}
+
+	res = copy_to_user(buf, onebyte_data, 1);
 
 	// If some bytes cannot be copied.
 	// Typically will not happen unless the byte really cannot be copied.
@@ -50,13 +62,27 @@ ssize_t onebyte_read(struct file *filep, char *buf, size_t count, loff_t *f_pos)
 		printk(KERN_ALERT "Onebyte device: An error occurred while reading from device.\n");
 		return 0;
 	}
+
+	(*f_pos)++;	// Advance seek pointer
 	return 1;	// 1 byte read on success
 }
 
 
 // If attempting to write more than 1 byte, only the first byte will be written.
 ssize_t onebyte_write(struct file *filep, const char *buf, size_t count, loff_t *f_pos){
-	unsigned long res = copy_from_user(onebyte_data, buf, 1);
+	unsigned long res;
+
+	if(!buf){
+		printk(KERN_ALERT "Onebyte device: Writing from invalid buffer!\n");
+		return 0;
+	}
+
+	if(*f_pos>0){
+		printk(KERN_ALERT "Onebyte device: Writing outside device boundary!\n");
+		return 0;
+	}
+
+	res = copy_from_user(onebyte_data, buf, 1);
 
 	// If fail to write that one byte
 	if(res){
@@ -67,6 +93,7 @@ ssize_t onebyte_write(struct file *filep, const char *buf, size_t count, loff_t 
 	// Trying to write too many bytes
 	if(count>1) printk(KERN_ALERT "Onebyte device: No space left on device.\n");
 	else printk(KERN_INFO "Onebyte device: Write successful!\n");
+	(*f_pos)+=count;
 	return 1;	// 1 byte written
 }
 
