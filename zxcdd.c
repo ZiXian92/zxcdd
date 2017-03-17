@@ -17,7 +17,7 @@ ssize_t onebyte_write(struct file *filep, const char *buf, size_t count, loff_t 
 static void onebyte_exit(void);
 
 /* File operations data structure definition */
-struct file_operations  onebyte_ops = {
+struct file_operations  onebyte_fops = {
 	read: onebyte_read,
 	write: onebyte_write,
 	open: onebyte_open,
@@ -37,7 +37,7 @@ int onebyte_open(struct inode *inode, struct file *filep){
 // Always successful. This time no post-processing needed so do nothing.
 int onebyte_release(struct inode *inode, struct file *filep){
 	numOpens--;
-	printk(KERN_INFO "onebyte device: %d fds open.\n" numOpens);
+	printk(KERN_INFO "onebyte device: %d fds open.\n", numOpens);
 	return 0;
 }
 
@@ -77,7 +77,7 @@ static int onebyte_init(void){
 	result = register_chrdev(MAJOR_NUMBER, DEVICE_CLASS, &onebyte_fops);
 
 	// Fail to register device
-	if(result<0) return result
+	if(result<0) return result;
 
 	// Allocate one byte of memory for storage
 	// kmalloc is just like malloc, 2nd parameter is memory type requested.
