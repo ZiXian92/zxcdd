@@ -46,12 +46,12 @@ ssize_t onebyte_read(struct file *filep, char *buf, size_t count, loff_t *f_pos)
 
 	if(!buf){	// If buf is NULL
 		printk(KERN_ALERT "Onebyte device: Reading into invalid buffer!\n");
-		return 0;
+		return -EFAULT;
 	}
 
 	if(*f_pos>0){
 		printk(KERN_ALERT "Onebyte device: Reading outside device boundary!\n");
-		return 0;
+		return -ESPIPE;
 	}
 
 	res = copy_to_user(buf, onebyte_data, 1);
@@ -60,7 +60,7 @@ ssize_t onebyte_read(struct file *filep, char *buf, size_t count, loff_t *f_pos)
 	// Typically will not happen unless the byte really cannot be copied.
 	if(res){
 		printk(KERN_ALERT "Onebyte device: An error occurred while reading from device.\n");
-		return 0;
+		return -EIO;
 	}
 
 	(*f_pos)++;	// Advance seek pointer
@@ -74,12 +74,12 @@ ssize_t onebyte_write(struct file *filep, const char *buf, size_t count, loff_t 
 
 	if(!buf){
 		printk(KERN_ALERT "Onebyte device: Writing from invalid buffer!\n");
-		return 0;
+		return -EFAULT;
 	}
 
 	if(*f_pos>0){
 		printk(KERN_ALERT "Onebyte device: Writing outside device boundary!\n");
-		return 0;
+		return -ESPIPE;
 	}
 
 	res = copy_from_user(onebyte_data, buf, 1);
@@ -87,7 +87,7 @@ ssize_t onebyte_write(struct file *filep, const char *buf, size_t count, loff_t 
 	// If fail to write that one byte
 	if(res){
 		printk(KERN_ALERT "Onebyte device: Failed to write to device.\n");
-		return 0;
+		return -EIO;
 	}
 
 	// Trying to write too many bytes
