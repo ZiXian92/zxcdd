@@ -94,7 +94,7 @@ ssize_t onebyte_write(struct file *filep, const char *buf, size_t count, loff_t 
 	if(count>1) printk(KERN_ALERT "Onebyte device: No space left on device.\n");
 	else printk(KERN_INFO "Onebyte device: Write successful!\n");
 	(*f_pos)+=count;
-	return count;	// 1 byte written
+	return count>1? -ENOSPC: count;
 }
 
 static int onebyte_init(void){
