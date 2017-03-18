@@ -138,5 +138,8 @@ static void onebyte_exit(void){
 }
 
 MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Qua Zi Xian");
+MODULE_DESCRIPTION("Simple onebyte character device driver.");
+MODULE_VERSION("1.0");
 module_init(onebyte_init);
 module_exit(onebyte_exit);
