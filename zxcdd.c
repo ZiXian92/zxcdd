@@ -10,9 +10,13 @@
 
 #define MAJOR_NUMBER 61
 #define DEVICE_CLASS "zxcdd"
-#define SCULL_IOC_MAGIC 'k'
-#define SCULL_IOC_MAXNR _IOC_NRMASK
-#define SCULL_HELLO _IO(SCULL_IOC_MAGIC, 1)
+#define DEVICE_MSG_SIZE 8
+#define ZXCDD_IOC_MAGIC 'k'
+#define ZXCDD_IOC_MAXNR _IOC_NRMASK
+#define ZXCDD_HELLO _IO(ZXCDD_IOC_MAGIC, 1)
+#define ZXCDD_READ _IOC(_IOC_READ, ZXCDD_IOC_MAGIC, 2, DEVICE_MSG_SIZE)
+#define ZXCDD_WRITE _IOC(_IOC_WRITE, ZXCDD_IOC_MAGIC, 3, DEVICE_MSG_SIZE)
+#define ZXCDD_READWRITE _IOC(_IOC_READ|_IOC_WRITE, ZXCDD_IOC_MAGIC, 4, DEVICE_MSG_SIZE)
 
 int zxcdd_open(struct inode *inode, struct file *filep);
 int zxcdd_release(struct inode *inode, struct file *filep);
@@ -34,6 +38,7 @@ struct file_operations zxcdd_fops = {
 };
 
 static char *zxcdd_data = NULL;
+static char *zxcdd_msg = NULL;
 static const int DEVICE_DATA_SIZE = 1<<22;
 static int numOpens = 0, data_len = 0;
 
@@ -150,8 +155,8 @@ ssize_t zxcdd_write(struct file *filep, const char *buf, size_t count, loff_t *f
 
 long zxcdd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
 	int err = 0, retval = 0;
-	if(_IOC_TYPE(cmd)!=SCULL_IOC_MAGIC) return -ENOTTY;
-	if(_IOC_NR(cmd)>SCULL_IOC_MAXNR) return -ENOTTY;
+	if(_IOC_TYPE(cmd)!=ZXCDD_IOC_MAGIC) return -ENOTTY;
+	if(_IOC_NR(cmd)>ZXCDD_IOC_MAXNR) return -ENOTTY;
 
 	if(_IOC_DIR(cmd)&_IOC_READ)
 		err = !access_ok(VERIFY_WRITE, (void __user *)arg, _IOC_SIZE(cmd));
@@ -159,7 +164,10 @@ long zxcdd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
 		err = !access_ok(VERIFY_READ, (void __user *)arg, _IOC_SIZE(cmd));
 	if(err) return -EFAULT;
 	switch(cmd){
-		case SCULL_HELLO: printk(KERN_WARNING "hello\n"); break;
+		case ZXCDD_HELLO: printk(KERN_WARNING "hello\n"); break;
+		case ZXCDD_READ: retval = copy_to_user((void __user *)arg, zxcdd_msg, _IOC_SIZE(cmd))? -EIO: _IOC_SIZE(cmd); break;
+		case ZXCDD_WRITE: retval = copy_from_user(zxcdd_msg, (void __user *)arg, _IOC_SIZE(cmd))? -EIO: _IOC_SIZE(cmd); break;
+		case ZXCDD_READWRITE: retval = 0; break;
 		default: return -ENOTTY;
 	}
 	return retval;
@@ -178,9 +186,10 @@ static int zxcdd_init(void){
 	// kmalloc is just like malloc, 2nd parameter is memory type requested.
 	// Release using kfree.
 	zxcdd_data = kmalloc(DEVICE_DATA_SIZE*sizeof(char), GFP_KERNEL);
+	zxcdd_msg = kmalloc((DEVICE_MSG_SIZE+1)*sizeof(char), GFP_KERNEL);
 
 	// Fail to allocate any memory
-	if(!zxcdd_data){
+	if(!zxcdd_data || !zxcdd_msg){
 		zxcdd_exit();
 		return -ENOMEM;
 	}
@@ -194,7 +203,8 @@ static void zxcdd_exit(void){
 	// Free memory if allocated
 	if(zxcdd_data){
 		kfree(zxcdd_data);
-		zxcdd_data = NULL;
+		kfree(zxcdd_msg);
+		zxcdd_data = zxcdd_msg = NULL;
 	}
 
 	// Unregister device
