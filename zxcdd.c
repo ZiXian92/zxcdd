@@ -15,9 +15,9 @@
 #define ZXCDD_IOC_MAGIC 'k'
 #define ZXCDD_IOC_MAXNR _IOC_NRMASK
 #define ZXCDD_HELLO _IO(ZXCDD_IOC_MAGIC, 1)
-#define ZXCDD_READ _IOC(_IOC_READ, ZXCDD_IOC_MAGIC, 2, DEVICE_MSG_SIZE)
-#define ZXCDD_WRITE _IOC(_IOC_WRITE, ZXCDD_IOC_MAGIC, 3, DEVICE_MSG_SIZE)
-#define ZXCDD_READWRITE _IOC(_IOC_READ|_IOC_WRITE, ZXCDD_IOC_MAGIC, 4, DEVICE_MSG_SIZE)
+#define ZXCDD_READ _IOR(ZXCDD_IOC_MAGIC, 2, char *)
+#define ZXCDD_WRITE _IOW(ZXCDD_IOC_MAGIC, 3, char *)
+#define ZXCDD_READWRITE _IOWR(ZXCDD_IOC_MAGIC, 4, char *)
 
 int zxcdd_open(struct inode *inode, struct file *filep);
 int zxcdd_release(struct inode *inode, struct file *filep);
