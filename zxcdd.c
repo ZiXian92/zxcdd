@@ -1,5 +1,6 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
+#include <linux/ioctl.h>
 #include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/types.h>
@@ -9,12 +10,17 @@
 
 #define MAJOR_NUMBER 61
 #define DEVICE_CLASS "zxcdd"
+#define SCULL_IOC_MAGIC 'k'
+#define SCULL_IOC_MAXNR _IOC_NRMASK
+#define SCULL_HELLO _IO(SCULL_IOC_MAGIC, 1)
 
 int zxcdd_open(struct inode *inode, struct file *filep);
 int zxcdd_release(struct inode *inode, struct file *filep);
 loff_t zxcdd_llseek(struct file *filep, loff_t shift, int origin);
 ssize_t zxcdd_read(struct file *filep, char *buf, size_t count, loff_t *f_pos);
 ssize_t zxcdd_write(struct file *filep, const char *buf, size_t count, loff_t *f_pos);
+long zxcdd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
+static int zxcdd_init(void);
 static void zxcdd_exit(void);
 
 /* File operations data structure definition */
@@ -23,7 +29,8 @@ struct file_operations zxcdd_fops = {
 	read: zxcdd_read,
 	write: zxcdd_write,
 	open: zxcdd_open,
-	release: zxcdd_release
+	release: zxcdd_release,
+	unlocked_ioctl: zxcdd_ioctl
 };
 
 static char *zxcdd_data = NULL;
@@ -87,7 +94,8 @@ ssize_t zxcdd_read(struct file *filep, char *buf, size_t count, loff_t *f_pos){
 		return -EIO;
 	}
 
-	(*f_pos)+=bytes_to_read;	// Advance seek pointer
+	//filep->f_pos+=bytes_to_read;	// Advance file's cursor
+	(*f_pos)+=bytes_to_read;	// Advance caller's cursor
 	return bytes_to_read;	// Return number of bytes read
 }
 
@@ -132,10 +140,29 @@ ssize_t zxcdd_write(struct file *filep, const char *buf, size_t count, loff_t *f
 		printk(KERN_ALERT "ZXCDD: No space left on device.\n");
 	else
 		printk(KERN_INFO "ZXCDD: Write successful!\n");
-	(*f_pos)+=bytes_to_write;
-	data_len = data_len<*f_pos? *f_pos: data_len;
-	printk(KERN_DEBUG "ZXCDD: Device buffer size is %d\n", data_len);
-	return bytes_to_write;
+
+	//filep->f_pos+=bytes_to_write;	// Advance file's cursor
+	(*f_pos)+=bytes_to_write;	// Advance user's cursor
+	data_len = data_len<*f_pos? *f_pos: data_len;	// Expand size if needed
+	// printk(KERN_DEBUG "ZXCDD: Device buffer size is %d\n", data_len);
+	return bytes_to_write;	// Returns number of bytes written
+}
+
+long zxcdd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
+	int err = 0, retval = 0;
+	if(_IOC_TYPE(cmd)!=SCULL_IOC_MAGIC) return -ENOTTY;
+	if(_IOC_NR(cmd)>SCULL_IOC_MAXNR) return -ENOTTY;
+
+	if(_IOC_DIR(cmd)&_IOC_READ)
+		err = !access_ok(VERIFY_WRITE, (void __user *)arg, _IOC_SIZE(cmd));
+	else if(_IOC_DIR(cmd)&_IOC_WRITE)
+		err = !access_ok(VERIFY_READ, (void __user *)arg, _IOC_SIZE(cmd));
+	if(err) return -EFAULT;
+	switch(cmd){
+		case SCULL_HELLO: printk(KERN_WARNING "hello\n"); break;
+		default: return -ENOTTY;
+	}
+	return retval;
 }
 
 static int zxcdd_init(void){
@@ -158,7 +185,7 @@ static int zxcdd_init(void){
 		return -ENOMEM;
 	}
 
-	printk(KERN_ALERT "ZXCDD: ZXCDD initialized. Current data size is %d\n", data_len);
+	printk(KERN_ALERT "ZXCDD: ZXCDD initialized.\n");
 
 	return 0;
 }
