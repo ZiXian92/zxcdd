@@ -6,6 +6,7 @@
 #include <linux/types.h>
 #include <linux/fs.h>
 #include <linux/proc_fs.h>
+#include <linux/string.h>
 #include <asm/uaccess.h>
 
 #define MAJOR_NUMBER 61
@@ -166,7 +167,10 @@ long zxcdd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
 	switch(cmd){
 		case ZXCDD_HELLO: printk(KERN_WARNING "hello\n"); break;
 		case ZXCDD_READ: retval = copy_to_user((void __user *)arg, zxcdd_msg, _IOC_SIZE(cmd))? -EIO: _IOC_SIZE(cmd); break;
-		case ZXCDD_WRITE: retval = copy_from_user(zxcdd_msg, (void __user *)arg, _IOC_SIZE(cmd))? -EIO: _IOC_SIZE(cmd); break;
+		case ZXCDD_WRITE:
+			retval = copy_from_user(zxcdd_msg, (void __user *)arg, _IOC_SIZE(cmd))? -EIO: _IOC_SIZE(cmd);
+			if(retval>0) printk(KERN_INFO "ZXCDD: Device message set to \"%s\"\n", zxcdd_msg);
+			break;
 		case ZXCDD_READWRITE: retval = 0; break;
 		default: return -ENOTTY;
 	}
@@ -193,6 +197,8 @@ static int zxcdd_init(void){
 		zxcdd_exit();
 		return -ENOMEM;
 	}
+
+	memset(zxcdd_msg, 0, DEVICE_MSG_SIZE+1);
 
 	printk(KERN_ALERT "ZXCDD: ZXCDD initialized.\n");
 
