@@ -100,7 +100,6 @@ ssize_t zxcdd_read(struct file *filep, char *buf, size_t count, loff_t *f_pos){
 		return -EIO;
 	}
 
-	//filep->f_pos+=bytes_to_read;	// Advance file's cursor
 	(*f_pos)+=bytes_to_read;	// Advance caller's cursor
 	return bytes_to_read;	// Return number of bytes read
 }
@@ -147,10 +146,8 @@ ssize_t zxcdd_write(struct file *filep, const char *buf, size_t count, loff_t *f
 	else
 		printk(KERN_INFO "ZXCDD: Write successful!\n");
 
-	//filep->f_pos+=bytes_to_write;	// Advance file's cursor
 	(*f_pos)+=bytes_to_write;	// Advance user's cursor
 	data_len = data_len<*f_pos? *f_pos: data_len;	// Expand size if needed
-	// printk(KERN_DEBUG "ZXCDD: Device buffer size is %d\n", data_len);
 	return bytes_to_write;	// Returns number of bytes written
 }
 
