@@ -156,6 +156,7 @@ ssize_t zxcdd_write(struct file *filep, const char *buf, size_t count, loff_t *f
 
 long zxcdd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
 	int err = 0, retval = 0;
+	char *tmp;
 	if(_IOC_TYPE(cmd)!=ZXCDD_IOC_MAGIC) return -ENOTTY;
 	if(_IOC_NR(cmd)>ZXCDD_IOC_MAXNR) return -ENOTTY;
 
@@ -171,7 +172,20 @@ long zxcdd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg){
 			retval = copy_from_user(zxcdd_msg, (void __user *)arg, _IOC_SIZE(cmd))? -EIO: _IOC_SIZE(cmd);
 			if(retval>0) printk(KERN_INFO "ZXCDD: Device message set to \"%s\"\n", zxcdd_msg);
 			break;
-		case ZXCDD_READWRITE: retval = 0; break;
+		case ZXCDD_READWRITE:
+			tmp = kmalloc((DEVICE_MSG_SIZE+1)*sizeof(char), GFP_KERNEL);
+			if(!tmp) return -ENOMEM;	// Cannot get temporary space for swapping.
+			tmp[DEVICE_MSG_SIZE] = 0;
+			// Use short-circuit copy in then copy out
+			retval = copy_from_user(tmp, (void __user *)arg, _IOC_SIZE(cmd)) || copy_to_user((void __user *)arg, zxcdd_msg, _IOC_SIZE(cmd));
+			if(!retval){	// Update device message
+				memcpy(zxcdd_msg, tmp, _IOC_SIZE(cmd));
+				printk(KERN_INFO "ZXCDD: Device message set to \"%s\"\n", zxcdd_msg);
+			}
+			kfree(tmp);	// Free out the temporary memory
+			tmp = NULL;
+			retval = retval? -EIO: _IOC_SIZE(cmd);
+			break;
 		default: return -ENOTTY;
 	}
 	return retval;
